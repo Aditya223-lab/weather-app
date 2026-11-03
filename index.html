@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Weather — Forecast at a glance</title>
+  <meta name="description" content="A clean weather app built with vanilla JavaScript and the Open-Meteo API. Current conditions, a 24-hour trend and a 7-day forecast, with no API key required." />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="theme-color" content="#0ea5e9" />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="preconnect" href="https://api.open-meteo.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script>
+    // Apply the saved theme before first paint to avoid a flash.
+    (function () {
+      try {
+        var saved = localStorage.getItem("weather.theme");
+        var dark = saved
+          ? saved === "dark"
+          : window.matchMedia("(prefers-color-scheme: dark)").matches;
+        document.documentElement.dataset.theme = dark ? "dark" : "light";
+      } catch (e) {
+        document.documentElement.dataset.theme = "light";
+      }
+    })();
+  </script>
+</head>
+<body>
+  <div class="sky" aria-hidden="true">
+    <span class="orb orb-1"></span>
+    <span class="orb orb-2"></span>
+    <span class="orb orb-3"></span>
+  </div>
+
+  <a class="skip-link" href="#cityInput">Skip to search</a>
+
+  <main class="app">
+    <!-- ───────────── Header ───────────── -->
+    <header class="app-header">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="9" cy="9" r="3.2" />
+            <path d="M9 2.6v1.6M9 13.8v1.6M2.6 9h1.6M13.8 9h1.6M4.5 4.5l1.1 1.1M12.4 12.4l1.1 1.1M13.5 4.5l-1.1 1.1M5.6 12.4l-1.1 1.1" />
+            <path d="M12.5 20H7a3.5 3.5 0 0 1 0-7 5 5 0 0 1 9.6-.6A3.8 3.8 0 0 1 17 20h-4.5z" fill="currentColor" stroke="none" opacity=".92" />
+          </svg>
+        </span>
+        <div class="brand-text">
+          <h1>Weather</h1>
+          <p>Open-Meteo · no API key</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <div class="unit-toggle" role="group" aria-label="Temperature units">
+          <button type="button" class="unit-btn is-active" id="unitC" aria-pressed="true">°C</button>
+          <button type="button" class="unit-btn" id="unitF" aria-pressed="false">°F</button>
+        </div>
+
+        <button type="button" id="themeToggle" class="icon-btn" aria-label="Switch theme" title="Switch theme (T)">
+          <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="4" />
+            <path d="M12 2v2m0 16v2M2 12h2m16 0h2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4m0-14.2-1.4 1.4M6.3 17.7l-1.4 1.4" />
+          </svg>
+          <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- ───────────── Search ───────────── -->
+    <section class="panel search-panel">
+      <form id="searchForm" class="search-form" role="search" autocomplete="off">
+        <div class="search-field">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" />
+            <path d="m20 20-3.5-3.5" />
+          </svg>
+          <label class="sr-only" for="cityInput">Search for a city</label>
+          <input
+            type="text"
+            id="cityInput"
+            placeholder="Search a city…"
+            autocomplete="off"
+            autocapitalize="words"
+            spellcheck="false"
+            role="combobox"
+            aria-expanded="false"
+            aria-autocomplete="list"
+            aria-controls="suggestions"
+          />
+          <button type="button" class="clear-btn" id="clearInput" aria-label="Clear search" hidden>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
+
+          <ul id="suggestions" class="suggestions" role="listbox" aria-label="City suggestions" hidden></ul>
+        </div>
+
+        <button type="button" class="icon-btn" id="geoBtn" aria-label="Use my location" title="Use my location">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 21s7-6.3 7-11a7 7 0 1 0-14 0c0 4.7 7 11 7 11z" />
+            <circle cx="12" cy="10" r="2.6" />
+          </svg>
+        </button>
+      </form>
+
+      <div class="recents" id="recents" hidden>
+        <span class="recents-label">Recent</span>
+        <div class="recents-list" id="recentsList"></div>
+      </div>
+    </section>
+
+    <!-- ───────────── Status: loading ───────────── -->
+    <section class="panel skeleton-panel" id="loading" hidden aria-hidden="true">
+      <div class="sk sk-line" style="width: 42%"></div>
+      <div class="sk-hero">
+        <div class="sk sk-temp"></div>
+        <div class="sk sk-icon"></div>
+      </div>
+      <div class="sk-grid">
+        <div class="sk sk-box"></div>
+        <div class="sk sk-box"></div>
+        <div class="sk sk-box"></div>
+        <div class="sk sk-box"></div>
+      </div>
+    </section>
+
+    <!-- ───────────── Status: error ───────────── -->
+    <section class="panel error-panel" id="error" hidden>
+      <svg class="error-art" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M17.5 19H7a4 4 0 0 1-.5-8 6 6 0 0 1 11.4-.7A4.3 4.3 0 0 1 17.5 19z" />
+        <path d="M12 8.5v3.5M12 15h.01" />
+      </svg>
+      <h2 id="errorTitle">Something went wrong</h2>
+      <p id="errorBody">Please try again.</p>
+      <button type="button" class="btn btn-primary" id="retryBtn">Try again</button>
+    </section>
+
+    <!-- ───────────── Status: welcome ───────────── -->
+    <section class="panel welcome-panel" id="welcome">
+      <svg class="welcome-art" viewBox="0 0 120 80" fill="none" aria-hidden="true">
+        <circle cx="40" cy="30" r="14" fill="currentColor" opacity=".25" />
+        <path d="M74 56H34a10 10 0 0 1 0-20 14 14 0 0 1 26.6-2A10.5 10.5 0 0 1 74 56z" fill="currentColor" opacity=".45" />
+      </svg>
+      <h2>Search for a city</h2>
+      <p>Type a place above, or use your current location, to see the forecast.</p>
+      <div class="quick-cities" id="quickCities"></div>
+    </section>
+
+    <!-- ───────────── Results ───────────── -->
+    <div id="result" hidden>
+      <!-- Current conditions -->
+      <section class="panel current-panel" aria-labelledby="placeName">
+        <div class="current-top">
+          <div class="place">
+            <h2 id="placeName">—</h2>
+            <p id="placeMeta">—</p>
+          </div>
+          <span class="live-dot" id="liveDot" title="Updated just now" aria-hidden="true"></span>
+        </div>
+
+        <div class="current-hero">
+          <div class="hero-left">
+            <p class="temp-now">
+              <span id="tempNow">—</span><span class="deg" id="tempUnit">°C</span>
+            </p>
+            <p class="condition" id="condition">—</p>
+            <p class="feels" id="feelsLike">—</p>
+          </div>
+          <div class="hero-icon" id="heroIcon" aria-hidden="true"></div>
+        </div>
+
+        <div class="hi-lo">
+          <span class="hi-lo-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+              <path d="m6 14 6-6 6 6" />
+            </svg>
+            High <strong id="todayHigh">—</strong>
+          </span>
+          <span class="hi-lo-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+              <path d="m6 10 6 6 6-6" />
+            </svg>
+            Low <strong id="todayLow">—</strong>
+          </span>
+        </div>
+
+        <dl class="detail-grid" id="detailGrid"></dl>
+      </section>
+
+      <!-- Hourly -->
+      <section class="panel" aria-labelledby="hourlyHeading">
+        <div class="panel-head">
+          <h3 id="hourlyHeading">Next 24 hours</h3>
+          <span class="panel-note" id="hourlyNote"></span>
+        </div>
+        <div class="chart-wrap">
+          <svg id="hourlyChart" class="hourly-chart" role="img" aria-labelledby="hourlyHeading"></svg>
+        </div>
+        <div class="hourly-strip" id="hourlyStrip" tabindex="0" aria-label="Hourly forecast, scrollable"></div>
+      </section>
+
+      <!-- Daily -->
+      <section class="panel" aria-labelledby="dailyHeading">
+        <div class="panel-head">
+          <h3 id="dailyHeading">7-day forecast</h3>
+          <span class="panel-note" id="dailyNote"></span>
+        </div>
+        <ul class="daily-list" id="dailyList"></ul>
+      </section>
+    </div>
+
+    <footer class="app-footer">
+      <span>Data by <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Open-Meteo</a></span>
+      <span id="updatedAt"></span>
+    </footer>
+  </main>
+
+  <div class="toast-wrap">
+    <div id="toast" class="toast" hidden><span id="toastMsg"></span></div>
+  </div>
+  <p id="srStatus" class="sr-only" role="status" aria-live="polite"></p>
+
+  <script src="script.js"></script>
+</body>
+</html>
